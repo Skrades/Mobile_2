@@ -1,5 +1,7 @@
 package com.example.application
 
+import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -9,8 +11,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import androidx.core.content.edit
 
-class NewsViewModel : ViewModel() {
+class NewsViewModel(context: Context) : ViewModel() {
+    private val prefs = context.getSharedPreferences("news_likes", MODE_PRIVATE)
     private val allNews = mutableStateListOf<News>()
     val displayedNews = mutableStateListOf<News>()
     private var updateJob: Job? = null
@@ -34,7 +38,10 @@ class NewsViewModel : ViewModel() {
             News(10, "Новость 10", "Итоги месяца и планы на будущее...")
         )
 
-        allNews.addAll(newsList)
+        allNews.addAll(newsList.map { news ->
+            val savedLikes = prefs.getInt("news_${news.id}", 0)
+            news.copy(likes = savedLikes)
+        })
 
         displayedNews.clear()
         repeat(4) {
@@ -43,15 +50,18 @@ class NewsViewModel : ViewModel() {
     }
 
     fun likeNews(index: Int) {
-        if (index in 0 until displayedNews.size) {
+        if (index in displayedNews.indices) {
             val news = displayedNews[index]
-            val updatedNews = news.copy(likes = news.likes + 1)
-            displayedNews[index] = updatedNews
+            val newLikes = news.likes + 1
+
+            displayedNews[index] = news.copy(likes = newLikes)
 
             val allNewsIndex = allNews.indexOfFirst { it.id == news.id }
             if (allNewsIndex != -1) {
-                allNews[allNewsIndex] = updatedNews
+                allNews[allNewsIndex] = allNews[allNewsIndex].copy(likes = newLikes)
             }
+
+            prefs.edit { putInt("news_${news.id}", newLikes) }
         }
     }
 
